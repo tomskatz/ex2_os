@@ -15,6 +15,7 @@
 #define THREAD_LIBRARY_ERROR "thread library error: "
 #define SYSTEM_ERROR "system error: "
 #define MICRO_SECONDS 1000000
+#define RESET_TIMER 0
 #define RETURN_VALUE_FROM_JMP 1
 
 class sync_handler
@@ -75,15 +76,17 @@ private:
 
     static void init_timer();
 
+    static void set_interval_timer();
+
     static void set_timer();
+
+    static void reset_timer();
 
     static void sigvtalrm_handler(int);
 
     static void changeStateToReady();
 
     static void changeStateToRunning();
-
-    static void changeStateToTerminated(int id);
 
     static void block_maskedSignals();
 
@@ -104,6 +107,8 @@ public:
     void release_resources_by_thread(int id);
 
     void release_all_resources();
+
+    static void changeStateToBlocked(int id);
 
 };
 

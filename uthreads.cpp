@@ -95,3 +95,32 @@ int uthread_terminate(int tid)
     // todo think about thread that locked the mutex termination.
     return SUCCESS;
 }
+
+/*
+ * Description: This function blocks the thread with ID tid. The thread may
+ * be resumed later using uthread_resume. If no thread with ID tid exists it
+ * is considered as an error. In addition, it is an error to try blocking the
+ * main thread (tid == 0). If a thread blocks itself, a scheduling decision
+ * should be made. Blocking a thread in BLOCKED state has no
+ * effect and is not considered an error.
+ * Return value: On success, return 0. On failure, return -1.
+*/
+int uthread_block(int tid)
+{
+    // check if thread with this ID exists or if we are blocking the main thread
+    Thread* currThread = _syncHandler.get_thread_by_id(tid);
+    if (currThread == nullptr || currThread->getId() == 0)
+    {
+        return FAIL; //todo add msg
+    }
+
+    // if thread is in BLOCK status do nothing
+    if(currThread->getState() == BLOCKED) return SUCCESS;
+
+    //change the thread to BLOCK status
+    _syncHandler.changeStateToBlocked(tid);
+
+    return SUCCESS;
+
+
+}

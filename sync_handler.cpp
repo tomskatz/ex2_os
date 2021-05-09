@@ -112,6 +112,7 @@ void sync_handler::changeStateToReady()
 void sync_handler::changeStateToRunning()
 {
     _totalQuantumCount++;
+    //TODO: THINK IF WE NEED TO CHECK FIRST THAT THE _readyThreads is not empty
     _runningThread = _allThreads[_readyThreads.front()];
     _runningThread->setState(RUNNING);
     _runningThread->increaseQuantumCount();
@@ -121,6 +122,37 @@ void sync_handler::changeStateToRunning()
     siglongjmp(_runningThread->getEnv(), RETURN_VALUE_FROM_JMP);
 }
 
+void sync_handler::changeStateToBlocked(int id)
+{
+    block_maskedSignals();
+    Thread* threadToBlock = _allThreads[id];
+
+    if (threadToBlock->getState() == RUNNING)
+    {
+        reset_timer();
+        //If a thread blocks itself, a scheduling decision should be made ?
+        int ret_val = sigsetjmp(_runningThread->getEnv(), 1);
+        if (ret_val == 0)
+        {
+            //preempt the next ready thread to RUNNING
+            changeStateToRunning();
+        }
+    }
+    //TODO: DO WE NEED TO CHECK IF THERE ARE RESOURCES TO DELETE?
+
+    if (threadToBlock->getState() == READY)
+    {
+        //remove thread from the ready queue
+        _readyThreads.erase(std::remove(_readyThreads.begin(), _readyThreads.end(), id),
+                            _readyThreads.end());
+    }
+
+    //change the state and add to the blocked thread map
+    threadToBlock->setState(BLOCKED);
+    _blockedThreads[id] = threadToBlock;
+
+    unblock_maskedSignals();
+}
 
 void sync_handler::init_timer()
 {
@@ -133,17 +165,34 @@ void sync_handler::init_timer()
     }
 }
 
+void sync_handler::set_interval_timer()
+{
+    if (setitimer (ITIMER_VIRTUAL, &_timer, NULL)) {
+        printf("setitimer error."); // TODO change
+        exit(-1);
+    }
+}
+
 void sync_handler::set_timer()
 {
     _timer.it_value.tv_sec = _quantumSecs / MICRO_SECONDS;
     _timer.it_value.tv_usec = _quantumSecs % MICRO_SECONDS;
 
-    _timer.it_interval.tv_sec = 0;
-    _timer.it_interval.tv_usec = 0;
+    _timer.it_interval.tv_sec = RESET_TIMER;
+    _timer.it_interval.tv_usec = RESET_TIMER;
 
-    if (setitimer (ITIMER_VIRTUAL, &_timer, NULL)) {
-        printf("setitimer error."); // TODO change
-    }
+    set_interval_timer();
+}
+
+void sync_handler::reset_timer()
+{
+    _timer.it_value.tv_sec = RESET_TIMER;
+    _timer.it_value.tv_usec = RESET_TIMER;
+
+    _timer.it_interval.tv_sec = RESET_TIMER;
+    _timer.it_interval.tv_usec = RESET_TIMER;
+
+    set_interval_timer();
 }
 
 bool sync_handler::can_add_new_thread()
