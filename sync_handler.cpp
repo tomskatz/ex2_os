@@ -92,7 +92,7 @@ void sync_handler::init_sync_handler(int quantum_usecs)
 void sync_handler::sigvtalrm_handler(int)
 {
     block_maskedSignals();
-    changeStateToReady();
+    changeStateToReady(_runningThread->getId());
 
     int ret_val = sigsetjmp(_runningThread->getEnv(), 1);
     if (ret_val == 0)
@@ -103,10 +103,12 @@ void sync_handler::sigvtalrm_handler(int)
     unblock_maskedSignals();
 }
 
-void sync_handler::changeStateToReady()
+void sync_handler::changeStateToReady(int id)
 {
-    _runningThread->setState(READY);
-    _readyThreads.push_back(_runningThread->getId());
+    Thread* threadToReady = _allThreads[id];
+    threadToReady->setState(READY);
+    _readyThreads.push_back(threadToReady->getId());
+    //TODO: WE NEED TO CALL THE NEXT THREAD IN THE Q TO RUN ?
 }
 
 void sync_handler::changeStateToRunning()
@@ -152,6 +154,15 @@ void sync_handler::changeStateToBlocked(int id)
     _blockedThreads[id] = threadToBlock;
 
     unblock_maskedSignals();
+}
+
+void sync_handler::resumeThread(int id)
+{
+    block_maskedSignals();
+    //remove from the blocked list
+    _blockedThreads.erase(id);
+     changeStateToReady(id);
+     unblock_maskedSignals();
 }
 
 void sync_handler::init_timer()
@@ -242,5 +253,20 @@ void sync_handler::release_all_resources()
     _blockedThreads.clear();
     // todo check if need to delete priority queue
     unblock_maskedSignals();
+}
+
+int sync_handler::get_running_thread_id()
+{
+    return _runningThread->getId();
+}
+
+int sync_handler::get_total_quantums()
+{
+    return _totalQuantumCount;
+}
+
+int sync_handler::get_quantums_by_id(int id)
+{
+    return _allThreads[id]->getQuantumCount();
 }
 

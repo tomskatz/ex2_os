@@ -1,6 +1,3 @@
-//
-// Created by Tom Katz on 07/05/2021.
-//
 #include <iostream>
 #include <stdlib.h>
 #include <queue>
@@ -121,6 +118,96 @@ int uthread_block(int tid)
     _syncHandler.changeStateToBlocked(tid);
 
     return SUCCESS;
-
-
 }
+
+/*
+ * Description: This function resumes a blocked thread with ID tid and moves
+ * it to the READY state if it's not synced. Resuming a thread in a RUNNING or READY state
+ * has no effect and is not considered as an error. If no thread with
+ * ID tid exists it is considered an error.
+ * Return value: On success, return 0. On failure, return -1.
+*/
+int uthread_resume(int tid)
+{
+    //there is no thread with this id : error
+    Thread* currThread = _syncHandler.get_thread_by_id(tid);
+    if (currThread == nullptr || currThread->getId() == 0)
+    {
+        return FAIL; //todo add msg
+    }
+
+    //resume the blocked thread if it is not running or ready status
+    if(currThread->getState() != RUNNING || currThread->getState() != READY)
+    {
+        _syncHandler.resumeThread(tid);
+    }
+
+    return SUCCESS;
+}
+
+/*
+ * Description: This function tries to acquire a mutex.
+ * If the mutex is unlocked, it locks it and returns.
+ * If the mutex is already locked by different thread, the thread moves to BLOCK state.
+ * In the future when this thread will be back to RUNNING state,
+ * it will try again to acquire the mutex.
+ * If the mutex is already locked by this thread, it is considered an error.
+ * Return value: On success, return 0. On failure, return -1.
+*/
+int uthread_mutex_lock(); //TODO
+
+
+/*
+ * Description: This function releases a mutex.
+ * If there are blocked threads waiting for this mutex,
+ * one of them (no matter which one) moves to READY state.
+ * If the mutex is already unlocked, it is considered an error.
+ * Return value: On success, return 0. On failure, return -1.
+*/
+int uthread_mutex_unlock(); //TODO
+
+/*
+ * Description: This function returns the thread ID of the calling thread.
+ * Return value: The ID of the calling thread.
+*/
+int uthread_get_tid()
+{
+    //todo : calling thread can be only the running one ?
+    return _syncHandler.get_running_thread_id();
+}
+
+/*
+ * Description: This function returns the total number of quantums since
+ * the library was initialized, including the current quantum.
+ * Right after the call to uthread_init, the value should be 1.
+ * Each time a new quantum starts, regardless of the reason, this number
+ * should be increased by 1.
+ * Return value: The total number of quantums.
+*/
+int uthread_get_total_quantums()
+{
+    return _syncHandler.get_total_quantums();
+}
+
+/*
+ * Description: This function returns the number of quantums the thread with
+ * ID tid was in RUNNING state. On the first time a thread runs, the function
+ * should return 1. Every additional quantum that the thread starts should
+ * increase this value by 1 (so if the thread with ID tid is in RUNNING state
+ * when this function is called, include also the current quantum). If no
+ * thread with ID tid exists it is considered an error.
+ * Return value: On success, return the number of quantums of the thread with ID tid.
+ * 			     On failure, return -1.
+*/
+int uthread_get_quantums(int tid)
+{
+    //if no thread with ID tid it's an error
+    Thread* currThread = _syncHandler.get_thread_by_id(tid);
+    if (currThread == nullptr || currThread->getId() == 0)
+    {
+        return FAIL; //todo add msg
+    }
+
+    return _syncHandler.get_quantums_by_id(tid);
+}
+

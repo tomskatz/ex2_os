@@ -84,7 +84,7 @@ private:
 
     static void sigvtalrm_handler(int);
 
-    static void changeStateToReady();
+    static void changeStateToReady(int id);
 
     static void changeStateToRunning();
 
@@ -109,6 +109,14 @@ public:
     void release_all_resources();
 
     static void changeStateToBlocked(int id);
+
+    static void resumeThread(int id);
+
+    static int get_running_thread_id();
+
+    static int get_total_quantums();
+
+    static int get_quantums_by_id(int id);
 
 };
 
