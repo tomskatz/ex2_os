@@ -8,6 +8,8 @@
 #define RUNNING 0
 #define READY 1
 #define BLOCKED 2
+#define BLOCKED_MUTEX 3
+#define BLOCKED_AND_BLOCKED_MUTEX 4
 
 class Thread
 
@@ -28,7 +30,8 @@ public:
 
     void setState(int new_state);
 
-    int getState() const;
+    int getState() const; // TODO go over all places where threads differ by state change
+    // according to BLOCKED_MUTEX & BLOCKED_AND_BLOCKED_MUTEX
 
     void increaseQuantumCount();
 

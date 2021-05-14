@@ -112,7 +112,10 @@ int uthread_block(int tid)
     }
 
     // if thread is in BLOCK status do nothing
-    if(currThread->getState() == BLOCKED) return SUCCESS;
+    if(currThread->getState() == BLOCKED || currThread->getState() == BLOCKED_AND_BLOCKED_MUTEX)
+    {
+        return SUCCESS;
+    }
 
     //change the thread to BLOCK status
     _syncHandler.changeStateToBlocked(tid);
@@ -134,6 +137,7 @@ int uthread_resume(int tid)
     if (currThread == nullptr || currThread->getId() == 0)
     {
         return FAIL; //todo add msg
+        // TODO NETTA ASK TOM - should this be exit(-1)?
     }
 
     //resume the blocked thread if it is not running or ready status
@@ -154,7 +158,15 @@ int uthread_resume(int tid)
  * If the mutex is already locked by this thread, it is considered an error.
  * Return value: On success, return 0. On failure, return -1.
 */
-int uthread_mutex_lock(); //TODO
+int uthread_mutex_lock()
+{
+    if (_syncHandler.get_mutex_thread_id() == _syncHandler.get_running_thread_id())
+    {
+        // TODO print error + realse resources?
+        exit(-1);
+    }
+    return _syncHandler.lock_mutex();
+}
 
 
 /*
@@ -164,7 +176,16 @@ int uthread_mutex_lock(); //TODO
  * If the mutex is already unlocked, it is considered an error.
  * Return value: On success, return 0. On failure, return -1.
 */
-int uthread_mutex_unlock(); //TODO
+int uthread_mutex_unlock()
+{
+    if (_syncHandler.get_mutex_thread_id() == -1) // tODO is this enough?
+    {
+        // TODO print error + realse resources?
+        exit(-1);
+    }
+    return _syncHandler.unlock_mutex();
+
+}
 
 /*
  * Description: This function returns the thread ID of the calling thread.

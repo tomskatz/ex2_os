@@ -10,8 +10,8 @@
 
 #ifndef EX2_OS_SYNC_HANDLER_H
 #define EX2_OS_SYNC_HANDLER_H
-#define SUCCESS 0;
-#define FAIL -1;
+#define SUCCESS 0
+#define FAIL -1
 #define THREAD_LIBRARY_ERROR "thread library error: "
 #define SYSTEM_ERROR "system error: "
 #define MICRO_SECONDS 1000000
@@ -22,7 +22,7 @@ class sync_handler
 {
 private:
     /**
-     * counter for all the quantoms in the proess
+     * counter for all the quantoms in the process
      */
     static int _totalQuantumCount;
 
@@ -32,19 +32,29 @@ private:
     static Thread* _runningThread;
 
     /**
-     * A list of threads in 'READY' status
+     * the id of the thread that is currently locking the mutex. Will be -1 when unlocked
+     */
+    static int _mutexThreadId;
+
+    /**
+     * A queue of threads in 'READY' status
      */
     static std::deque<int> _readyThreads;
 
     /**
-     * A mapping between threadID and the thread pointer
+     * A mapping between threadID and the thread pointer - for all threads.
      */
     static std::unordered_map<int, Thread*> _allThreads;
 
     /**
-    * A mapping between threadID and the thread pointer
+    * A mapping between threadID and the thread pointer - for the blocked threads.
     */
     static std::unordered_map<int, Thread*> _blockedThreads;
+
+    /**
+     * A queue of threads in 'MUTEX_BLOCKED' status
+     */
+    static std::deque<int> _mutexBlockedThreads;
 
     /**
     * A set containing the signals to be blocked
@@ -52,7 +62,7 @@ private:
     static sigset_t _maskedSignals;
 
     /**
-     * A priority queue that keeps the next smallest available Id.
+     * A priority queue (min heap) that keeps the next smallest available Id.
      */
     static std::priority_queue<u_int, std::vector<u_int>, std::greater<u_int>> _nextAvailableID;
 
@@ -61,12 +71,17 @@ private:
      * */
     static struct sigaction _sa;
 
+    /**
+     * The timer used.
+     * */
     static struct itimerval _timer;
 
     /**
-     * The size of a quantum in ms (as recieved in the init)
+     * The size of a quantum in ms (as received in the init method).
      */
     static int _quantumSecs;
+
+    static pthread_mutex_t _mutex;
 
     /**
      * set the masking set and check system calls
@@ -82,6 +97,8 @@ private:
 
     static void reset_timer();
 
+    static void init_mutex();
+
     static void sigvtalrm_handler(int);
 
     static void changeStateToReady(int id);
@@ -94,6 +111,8 @@ private:
 
     static Thread* create_main_thread();
 
+    static void exit_and_print_error(std::string prefix, std::string msg);
+
 public:
 
     static int create_new_thread(void (*f)(void));
@@ -104,9 +123,9 @@ public:
 
     static Thread* get_thread_by_id(int id);
 
-    void release_resources_by_thread(int id);
+    static void release_resources_by_thread(int id);
 
-    void release_all_resources();
+    static void release_all_resources();
 
     static void changeStateToBlocked(int id);
 
@@ -114,10 +133,15 @@ public:
 
     static int get_running_thread_id();
 
+    static int get_mutex_thread_id();
+
     static int get_total_quantums();
 
     static int get_quantums_by_id(int id);
 
+    static int lock_mutex();
+
+    static int unlock_mutex();
 };
 
 

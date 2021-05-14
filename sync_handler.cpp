@@ -39,6 +39,15 @@ void sync_handler::unblock_maskedSignals()
     }
 }
 
+void sync_handler::exit_and_print_error(std::string prefix, std::string msg)
+{
+    fprintf(stderr, "%s%s/n", prefix.c_str(), msg.c_str());
+    release_resources_by_thread(_runningThread->getId());
+    release_all_resources();
+    exit(FAIL);
+    // TODO finish NETTA
+}
+
 Thread* sync_handler::create_main_thread()
 {
     Thread* thread = new(std::nothrow) Thread(0, nullptr);
@@ -85,6 +94,7 @@ void sync_handler::init_sync_handler(int quantum_usecs)
     _totalQuantumCount = 1;
     _runningThread = create_main_thread();
 
+    init_mutex();
     init_timer();
     set_timer();
 }
@@ -111,7 +121,7 @@ void sync_handler::changeStateToReady(int id)
     //TODO: WE NEED TO CALL THE NEXT THREAD IN THE Q TO RUN ?
 }
 
-void sync_handler::changeStateToRunning()
+void sync_handler::changeStateToRunning() // TODO CHANGE THIS METHOD NAME
 {
     _totalQuantumCount++;
     //TODO: THINK IF WE NEED TO CHECK FIRST THAT THE _readyThreads is not empty
@@ -149,8 +159,11 @@ void sync_handler::changeStateToBlocked(int id)
                             _readyThreads.end());
     }
 
+    int newState = (threadToBlock->getState() == BLOCKED_MUTEX) ? BLOCKED_AND_BLOCKED_MUTEX :
+            BLOCKED;
+
     //change the state and add to the blocked thread map
-    threadToBlock->setState(BLOCKED);
+    threadToBlock->setState(newState);
     _blockedThreads[id] = threadToBlock;
 
     unblock_maskedSignals();
@@ -161,8 +174,15 @@ void sync_handler::resumeThread(int id)
     block_maskedSignals();
     //remove from the blocked list
     _blockedThreads.erase(id);
-     changeStateToReady(id);
-     unblock_maskedSignals();
+    if (_allThreads[id]->getState() == BLOCKED_AND_BLOCKED_MUTEX)
+    {
+        _allThreads[id]->setState(BLOCKED_MUTEX);
+    }
+    else
+    {
+        changeStateToReady(id);
+    }
+    unblock_maskedSignals();
 }
 
 void sync_handler::init_timer()
@@ -173,6 +193,19 @@ void sync_handler::init_timer()
     {
         exit(-1);
         //TODO write message. + maybe terminate
+    }
+}
+
+void sync_handler::init_mutex()
+{
+    _mutex = PTHREAD_MUTEX_INITIALIZER;
+    _mutexThreadId = -1;
+    if (pthread_mutex_init(&_mutex, nullptr) != 0)
+    {
+        _mutex = nullptr;
+        // TODO check if we want to terminate.
+        //TODO write message
+        exit(-1);
     }
 }
 
@@ -227,7 +260,8 @@ void sync_handler::release_resources_by_thread(int id)
 {
     block_maskedSignals();
     Thread* threadToTerminate = _allThreads[id];
-    if (threadToTerminate->getState() == BLOCKED)
+    if (threadToTerminate->getState() == BLOCKED ||
+    threadToTerminate->getState() == BLOCKED_AND_BLOCKED_MUTEX)
     {
         _blockedThreads.erase(id);
     }
@@ -260,6 +294,11 @@ int sync_handler::get_running_thread_id()
     return _runningThread->getId();
 }
 
+int sync_handler::get_mutex_thread_id()
+{
+    return _mutexThreadId;
+}
+
 int sync_handler::get_total_quantums()
 {
     return _totalQuantumCount;
@@ -270,3 +309,56 @@ int sync_handler::get_quantums_by_id(int id)
     return _allThreads[id]->getQuantumCount();
 }
 
+int sync_handler::lock_mutex()
+{
+    // sigset will save the current location to return to in case the lock fails.
+    sigsetjmp(_runningThread->getEnv(), 1);
+    block_maskedSignals();
+    if (_mutexThreadId != -1)
+    {
+        _runningThread->setState(BLOCKED_MUTEX);
+        _mutexBlockedThreads.push_back(_runningThread->getId());
+        changeStateToRunning(); // puts a new thread in running
+        unblock_maskedSignals();
+        return -1; // TODO CEHCK THIS - what should we return?
+    }
+
+    if (pthread_mutex_lock(&_mutex) != SUCCESS)
+    {
+        // TODO print error + realse resources?
+        exit(-1);
+    }
+    _mutexThreadId = get_running_thread_id();
+    unblock_maskedSignals();
+    return SUCCESS;
+}
+
+int sync_handler::unlock_mutex()
+{
+    block_maskedSignals();
+    if (pthread_mutex_unlock(&_mutex) != SUCCESS){
+        // TODO print error + realse resources?
+        exit(-1);
+    }
+    _mutexThreadId = -1;
+
+    // Searching for the first thread that isn't BLOCKED, and changing its state to READY.
+    int i = 0;
+    for(auto threadId : _mutexBlockedThreads)
+    {
+        Thread* nextThread = _allThreads[threadId];
+        if (nextThread->getState() == BLOCKED_MUTEX)
+        {
+            changeStateToReady(nextThread->getId());
+            unblock_maskedSignals();
+            return SUCCESS;
+        }
+        i++;
+    }
+    // When reaching this part, all threads are BLOCKED_AND_BLOCKED_MUTEX
+    // We will take the first thread and change it's state to blocked (removing the mutex block).
+    Thread* nextThread = _allThreads[_mutexBlockedThreads.front()];
+    _mutexBlockedThreads.pop_front();
+    nextThread->setState(BLOCKED);
+    return SUCCESS;
+}
