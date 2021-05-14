@@ -10,11 +10,27 @@
 #define EX2_OS_SYNC_HANDLER_H
 #define SUCCESS 0
 #define FAIL -1
+#define UNLOCKED -1
 #define THREAD_LIBRARY_ERROR "thread library error: "
 #define SYSTEM_ERROR "system error: "
 #define MICRO_SECONDS 1000000
 #define RESET_TIMER 0
 #define RETURN_VALUE_FROM_JMP 1
+#define UNLOCK_FAIL_MSG "Unlocking the mutex failed."
+#define LOCK_FAIL_MSG "Locking the mutex failed."
+#define SETITIMER_ERR_MSG "setitimer error."
+#define SIGACTION_ERR_MSG "sigaction error."
+#define SIGADDSET_FAIL_MSG "sigaddset failed to add signal to the set."
+#define SIGEMPTYSET_FAIL_MSG "sigemptyset failed to clear the set."
+#define SIGPROCMASK_BLOCK_FAIL_MSG "sigprocmask failed to block the set."
+#define SIGPROCMASK_UNBLOCK_FAIL_MSG "sigprocmask failed to unblock the set."
+
+#define CREATE_THREAD_FAIL_MSG "Allocating a new thread failed."
+
+#define INIT_MUTEX_ERR "Initializing the mutex failed."
+
+
+
 
 class sync_handler
 {
@@ -109,8 +125,6 @@ private:
 
     static Thread* create_main_thread();
 
-    static void exit_and_print_error(std::string prefix, std::string msg);
-
     static void remove_from_readyThreads(Thread* threadToRemove);
 
 public:
@@ -142,6 +156,11 @@ public:
     static int lock_mutex();
 
     static int unlock_mutex();
+
+    static void exit_and_print_error(std::string msg);
+
+    static int return_and_print_error(std::string msg);
+
 };
 
 

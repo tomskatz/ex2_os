@@ -72,5 +72,5 @@ int Thread::getQuantumCount() const
 
 __jmp_buf_tag* Thread::getEnv()
 {
-    return _env; // TODO check this works with int*
+    return _env;
 }

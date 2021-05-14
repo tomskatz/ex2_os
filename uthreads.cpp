@@ -6,13 +6,19 @@
 #include "Thread.h"
 #include "sync_handler.h"
 
-
-
-#define SUCCESS 0;
-#define FAIL -1;
+#define SUCCESS 0
+#define FAIL -1
+#define UNLOCKED -1
 #define NON_NEGATIVE_INT 0
+#define MAIN 0
 #define THREAD_LIBRARY_ERROR "thread library error: "
 #define SYSTEM_ERROR "system error: "
+#define SPAWN_ERR_MSG "Num of concurrent threads exceeds limit, not able to create new thread."
+#define INIT_ERR_MSG "invalid quantum usecs, non-positive integer"
+#define INVALID_TID_ERR_MSG "No thread with ID tid exits."
+#define BLOCK_ERR_MSG "No thread with ID tid exists or it's invalid to block main thread."
+#define MUTEX_ERR_MSG "Invalid - the mutex is already locked by this thread."
+#define MUTEX_UNLOCK_ERR_MSG "INVALID - The mutex is already unlocked."
 
 
  /**
@@ -33,8 +39,7 @@ int uthread_init(int quantum_usecs)
 {
     if (quantum_usecs <= NON_NEGATIVE_INT)
     {
-        fprintf(stderr, "%s%s\n", THREAD_LIBRARY_ERROR,
-                " invalid quantum usecs, non-positive integer");
+        fprintf(stderr, "%s%s\n", THREAD_LIBRARY_ERROR, INIT_ERR_MSG);
         return FAIL;
     }
     _syncHandler.init_sync_handler(quantum_usecs);
@@ -54,9 +59,9 @@ int uthread_init(int quantum_usecs)
 int uthread_spawn(void (*f)(void)){
     if(!_syncHandler.can_add_new_thread())
     {
-        return FAIL;
-        //TODO: EXIT MASSAGE
+        return _syncHandler.return_and_print_error(SPAWN_ERR_MSG);
     }
+
     return _syncHandler.create_new_thread(f);
 
 }
@@ -77,19 +82,17 @@ int uthread_terminate(int tid)
     Thread* currThread = _syncHandler.get_thread_by_id(tid);
     if (currThread == nullptr)
     {
-        return -1; //todo add msg
+        return _syncHandler.return_and_print_error(INVALID_TID_ERR_MSG);
     }
 
-    if (currThread->getId() == 0 || currThread->getState() == RUNNING)
+    if (currThread->getId() == MAIN || currThread->getState() == RUNNING)
     {
         _syncHandler.release_all_resources();
-        exit(0); // todo msg
-        //
+        exit(SUCCESS);
     }
 
     // TODO : check if running state need a spaical tretment
     _syncHandler.release_resources_by_thread(tid);
-    // todo think about thread that locked the mutex termination.
     return SUCCESS;
 }
 
@@ -106,9 +109,9 @@ int uthread_block(int tid)
 {
     // check if thread with this ID exists or if we are blocking the main thread
     Thread* currThread = _syncHandler.get_thread_by_id(tid);
-    if (currThread == nullptr || currThread->getId() == 0)
+    if (currThread == nullptr || currThread->getId() == MAIN)
     {
-        return FAIL; //todo add msg
+        return _syncHandler.return_and_print_error(BLOCK_ERR_MSG);
     }
 
     // if thread is in BLOCK status do nothing
@@ -134,10 +137,9 @@ int uthread_resume(int tid)
 {
     //there is no thread with this id : error
     Thread* currThread = _syncHandler.get_thread_by_id(tid);
-    if (currThread == nullptr || currThread->getId() == 0)
+    if (currThread == nullptr)
     {
-        return FAIL; //todo add msg
-        // TODO NETTA ASK TOM - should this be exit(-1)?
+        return _syncHandler.return_and_print_error(INVALID_TID_ERR_MSG);
     }
 
     //resume the blocked thread if it is not running or ready status
@@ -162,8 +164,7 @@ int uthread_mutex_lock()
 {
     if (_syncHandler.get_mutex_thread_id() == _syncHandler.get_running_thread_id())
     {
-        // TODO print error + realse resources?
-        exit(-1);
+        return _syncHandler.return_and_print_error(MUTEX_ERR_MSG);
     }
     return _syncHandler.lock_mutex();
 }
@@ -178,10 +179,10 @@ int uthread_mutex_lock()
 */
 int uthread_mutex_unlock()
 {
-    if (_syncHandler.get_mutex_thread_id() == -1) // tODO is this enough?
+    if (_syncHandler.get_mutex_thread_id() == UNLOCKED)
     {
-        // TODO print error + realse resources?
-        exit(-1);
+        return _syncHandler.return_and_print_error(MUTEX_UNLOCK_ERR_MSG);
+
     }
     return _syncHandler.unlock_mutex();
 
@@ -224,9 +225,9 @@ int uthread_get_quantums(int tid)
 {
     //if no thread with ID tid it's an error
     Thread* currThread = _syncHandler.get_thread_by_id(tid);
-    if (currThread == nullptr || currThread->getId() == 0)
+    if (currThread == nullptr)
     {
-        return FAIL; //todo add msg
+        return _syncHandler.return_and_print_error(INVALID_TID_ERR_MSG);
     }
 
     return _syncHandler.get_quantums_by_id(tid);

@@ -9,42 +9,47 @@
  */
 void sync_handler::init_maskedSignals()
 {
-    if (sigemptyset(&_maskedSignals) < 0)
+    if (sigemptyset(&_maskedSignals) < SUCCESS)
     {
-        fprintf(stderr, "%s%s/n", SYSTEM_ERROR, "sigemptyset failed to clear the set");
-        exit(1); //TODO : CHECK CLEARING THE RECOURSES
+        exit_and_print_error(SIGEMPTYSET_FAIL_MSG);
     }
-    if (sigaddset(&_maskedSignals, SIGVTALRM) < 0)
+    if (sigaddset(&_maskedSignals, SIGVTALRM) < SUCCESS)
     {
-        fprintf(stderr, "%s%s/n", SYSTEM_ERROR, "sigaddset failed to add signal to the set");
-        exit(1); //TODO : CHECK CLEARING THE RECOURSES
+        exit_and_print_error(SIGADDSET_FAIL_MSG);
     }
 }
 
 void sync_handler::block_maskedSignals()
 {
-    if (sigprocmask(SIG_BLOCK, &_maskedSignals, NULL) < 0)
+    if (sigprocmask(SIG_BLOCK, &_maskedSignals, NULL) < SUCCESS)
     {
-        exit(-1);
-        //TODO to fix + add error
+        exit_and_print_error(SIGPROCMASK_BLOCK_FAIL_MSG);
     }
 }
 
 void sync_handler::unblock_maskedSignals()
 {
-    if (sigprocmask(SIG_UNBLOCK, &_maskedSignals, NULL) < 0)
+    if (sigprocmask(SIG_UNBLOCK, &_maskedSignals, NULL) < SUCCESS)
     {
-        exit(-1);
-        //TODO to fix + add error
+        exit_and_print_error(SIGPROCMASK_UNBLOCK_FAIL_MSG);
     }
 }
 
-void sync_handler::exit_and_print_error(std::string prefix, std::string msg)
+void sync_handler::exit_and_print_error(std::string msg)
 {
-    fprintf(stderr, "%s%s/n", prefix.c_str(), msg.c_str());
+    fprintf(stderr, "%s%s/n", SYSTEM_ERROR, msg.c_str());
     release_resources_by_thread(_runningThread->getId());
     release_all_resources();
     exit(FAIL);
+    // TODO finish NETTA
+}
+
+int sync_handler::return_and_print_error(std::string msg)
+{
+    fprintf(stderr, "%s%s/n", THREAD_LIBRARY_ERROR, msg.c_str());
+    release_resources_by_thread(_runningThread->getId());
+    release_all_resources();
+    return FAIL;
     // TODO finish NETTA
 }
 
@@ -53,8 +58,7 @@ Thread* sync_handler::create_main_thread()
     Thread* thread = new(std::nothrow) Thread(0, nullptr);
     if (thread == nullptr)
     {
-        exit(-1);
-        //TODO to fix + add error (alloc fail)
+        exit_and_print_error(CREATE_THREAD_FAIL_MSG);
     }
     thread->setState(RUNNING);
     thread->increaseQuantumCount();
@@ -68,8 +72,7 @@ int sync_handler::create_new_thread(void (*f)(void))
     Thread* thread = new(std::nothrow) Thread(id, f);
     if (thread == nullptr)
     {
-        return FAIL;
-        //TODO to fix + add error (alloc fail)
+        exit_and_print_error(CREATE_THREAD_FAIL_MSG);
     }
     _nextAvailableID.pop();
     thread->setState(READY);
@@ -190,28 +193,25 @@ void sync_handler::init_timer()
 
     if (sigaction(SIGVTALRM, &_sa, NULL) < 0)
     {
-        exit(-1);
-        //TODO write message. + maybe terminate
+        exit_and_print_error(SIGACTION_ERR_MSG);
     }
 }
 
 void sync_handler::init_mutex()
 {
     _mutex = PTHREAD_MUTEX_INITIALIZER;
-    _mutexThreadId = -1;
-    if (pthread_mutex_init(&_mutex, nullptr) != 0)
+    _mutexThreadId = UNLOCKED;
+    if (pthread_mutex_init(&_mutex, nullptr) != SUCCESS)
     {
         // TODO check if we want to terminate.
-        //TODO write message
-        exit(-1);
+        exit_and_print_error(INIT_MUTEX_ERR);
     }
 }
 
 void sync_handler::set_interval_timer()
 {
     if (setitimer (ITIMER_VIRTUAL, &_timer, NULL)) {
-        printf("setitimer error."); // TODO change
-        exit(-1);
+        exit_and_print_error(SETITIMER_ERR_MSG);
     }
 }
 
@@ -252,8 +252,6 @@ Thread* sync_handler::get_thread_by_id(int id)
     return thread->second;
 }
 
-
-
 void sync_handler::release_resources_by_thread(int id)
 {
     block_maskedSignals();
@@ -266,6 +264,11 @@ void sync_handler::release_resources_by_thread(int id)
     if (threadToTerminate->getState() == READY)
     {
         remove_from_readyThreads(threadToTerminate);
+    }
+    if (threadToTerminate->getState() == BLOCKED_MUTEX ||
+    threadToTerminate->getState() == BLOCKED_AND_BLOCKED_MUTEX)
+    {
+        unlock_mutex();
     }
     delete(threadToTerminate);
     _allThreads.erase(id);
@@ -335,8 +338,7 @@ int sync_handler::lock_mutex()
 
     if (pthread_mutex_lock(&_mutex) != SUCCESS)
     {
-        // TODO print error + realse resources?
-        exit(-1);
+        exit_and_print_error(LOCK_FAIL_MSG);
     }
     _mutexThreadId = get_running_thread_id();
     unblock_maskedSignals();
@@ -347,8 +349,7 @@ int sync_handler::unlock_mutex()
 {
     block_maskedSignals();
     if (pthread_mutex_unlock(&_mutex) != SUCCESS){
-        // TODO print error + realse resources?
-        exit(-1);
+        exit_and_print_error(UNLOCK_FAIL_MSG);
     }
     _mutexThreadId = -1;
 
