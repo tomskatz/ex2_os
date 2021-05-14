@@ -37,7 +37,7 @@ public:
 
     int getQuantumCount() const;
 
-    int* getEnv();
+    __jmp_buf_tag* getEnv();
 };
 
 

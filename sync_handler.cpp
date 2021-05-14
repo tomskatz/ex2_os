@@ -155,8 +155,7 @@ void sync_handler::changeStateToBlocked(int id)
     if (threadToBlock->getState() == READY)
     {
         //remove thread from the ready queue
-        _readyThreads.erase(std::remove(_readyThreads.begin(), _readyThreads.end(), id),
-                            _readyThreads.end());
+        remove_from_readyThreads(threadToBlock);
     }
 
     int newState = (threadToBlock->getState() == BLOCKED_MUTEX) ? BLOCKED_AND_BLOCKED_MUTEX :
@@ -202,7 +201,6 @@ void sync_handler::init_mutex()
     _mutexThreadId = -1;
     if (pthread_mutex_init(&_mutex, nullptr) != 0)
     {
-        _mutex = nullptr;
         // TODO check if we want to terminate.
         //TODO write message
         exit(-1);
@@ -267,13 +265,25 @@ void sync_handler::release_resources_by_thread(int id)
     }
     if (threadToTerminate->getState() == READY)
     {
-        _readyThreads.erase(std::remove(_readyThreads.begin(), _readyThreads.end(), id),
-                            _readyThreads.end());
+        remove_from_readyThreads(threadToTerminate);
     }
     delete(threadToTerminate);
     _allThreads.erase(id);
     _nextAvailableID.push(id);
     unblock_maskedSignals();
+}
+
+void sync_handler::remove_from_readyThreads(Thread* threadToRemove)
+{
+    int i = 0;
+    for(auto threadId : _readyThreads)
+    {
+        if (threadToRemove->getId() == threadId)
+        {
+            _readyThreads.erase(_readyThreads.begin() + i);
+        }
+        i++;
+    }
 }
 
 void sync_handler::release_all_resources()
@@ -349,6 +359,7 @@ int sync_handler::unlock_mutex()
         Thread* nextThread = _allThreads[threadId];
         if (nextThread->getState() == BLOCKED_MUTEX)
         {
+            _mutexBlockedThreads.erase(_mutexBlockedThreads.begin() + i);
             changeStateToReady(nextThread->getId());
             unblock_maskedSignals();
             return SUCCESS;

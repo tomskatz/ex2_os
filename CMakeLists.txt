@@ -3,4 +3,4 @@ project(ex2_os)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_executable(ex2_os main.cpp uthreads.cpp sync_handler.cpp sync_handler.h Thread.cpp Thread.h)
+add_executable(ex2_os main.cpp uthreads.h uthreads.cpp sync_handler.cpp sync_handler.h Thread.cpp Thread.h)

@@ -6,8 +6,6 @@
 #include <sys/time.h>
 #include <setjmp.h>
 
-
-
 #ifndef EX2_OS_SYNC_HANDLER_H
 #define EX2_OS_SYNC_HANDLER_H
 #define SUCCESS 0
@@ -112,6 +110,8 @@ private:
     static Thread* create_main_thread();
 
     static void exit_and_print_error(std::string prefix, std::string msg);
+
+    static void remove_from_readyThreads(Thread* threadToRemove);
 
 public:
 

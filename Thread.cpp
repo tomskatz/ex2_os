@@ -1,4 +1,5 @@
 #include <iostream>
+#include <signal.h>
 #include "Thread.h"
 
 #ifdef __x86_64__
@@ -69,7 +70,7 @@ int Thread::getQuantumCount() const
     return _quantumCount;
 }
 
-int* Thread::getEnv()
+__jmp_buf_tag* Thread::getEnv()
 {
     return _env; // TODO check this works with int*
 }
